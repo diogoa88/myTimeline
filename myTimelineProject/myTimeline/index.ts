@@ -81,21 +81,35 @@ export class myTimeline implements ComponentFramework.StandardControl<IInputs, I
 		for (let currentActivity of this.activities) {
 			var startdate = currentActivity[currentActivity.startDateField] != null ? new Date(currentActivity[currentActivity.startDateField]) : new Date();
 			var enddate = currentActivity[currentActivity.endDateField] != null ? new Date(currentActivity[currentActivity.endDateField]) : new Date();
-			var label = currentActivity[currentActivity.descriptionField] != null ? currentActivity[currentActivity.descriptionField] : "";
+			var description = currentActivity[currentActivity.descriptionField] != null ? currentActivity[currentActivity.descriptionField] : "";
+			var title = currentActivity[currentActivity.titleField] != null ? currentActivity[currentActivity.titleField] : "";
 			var color = currentActivity.colorField;
 
-			if (startdate != null && startdate != new Date() && label != null && label != "" && label != undefined) {
+			if (title != "" && title != null) {
+				var iconType = "box";
+
+				if (startdate == new Date() && enddate == new Date())
+					continue;
+
+				if (startdate == new Date() && enddate != new Date()) {
+					startdate = enddate;
+					enddate = new Date();
+				}
+
+				if (startdate != new Date() && enddate == new Date()) {
+					iconType = "point";
+				}
+
 				let item = {
 					id: ++i,
-					content: label,
+					content: title != "" && title != null ? title : "",
 					start: this.FormatDate(startdate),
 					end: (enddate != new Date()) ? this.FormatDate(enddate) : "",
-					type: 'box',
-					title: '',
+					type: iconType,
+					title: description,
 					style: "background-color: " + color + ";"
 				}
 
-				item["title"] = (item.end != "") ? item.start + "  -  " + item.end : item.start;
 				timeLineItems.add(item);
 			}
 		}
@@ -145,9 +159,10 @@ export class myTimeline implements ComponentFramework.StandardControl<IInputs, I
 			var entityNameField = currentConfiguration["childConfig.myp_entityname"];
 			var regardingName = currentConfiguration["childConfig.myp_regardingname"];
 			var colorField = currentConfiguration["childConfig.myp_color"];
+			var titleField = currentConfiguration["childConfig.myp_title"];
 
 			try {
-				var activityAux = await this.getActivity(startDateField, endDateField, descriptionField, entityNameField, regardingName);
+				var activityAux = await this.getActivity(startDateField, endDateField, descriptionField, entityNameField, regardingName, titleField);
 				activityAux = JSON.parse(JSON.stringify(activityAux));
 
 				for (let activityTemp of activityAux) {
@@ -157,6 +172,7 @@ export class myTimeline implements ComponentFramework.StandardControl<IInputs, I
 					activityTemp.entityNameField = entityNameField;
 					activityTemp.regardingName = regardingName;
 					activityTemp.colorField = colorField;
+					activityTemp.titleField = titleField;
 					this.activities.push(activityTemp);
 				}
 			} catch (error) {
@@ -165,19 +181,25 @@ export class myTimeline implements ComponentFramework.StandardControl<IInputs, I
 		}
 	}
 
-	public async getActivity(startDateField: string, endDateField: string, descriptionField: string, entityName: string, regardingField: string) {
+	public async getActivity(startDateField: string, endDateField: string, descriptionField: string, entityName: string, regardingField: string, titleField: string) {
 		debugger;
+		var fetchData = {
+			regardingobjectid: this.currentRecord.id
+		};
+
 		var fetchXml = [
 			"<fetch>",
-			"  <entity name='" + entityName + "' />",
+			"  <entity name='" + entityName + "'>",
 			"    <attribute name='" + startDateField + "' />",
 			"    <attribute name='" + endDateField + "' />",
 			"    <attribute name='" + descriptionField + "' />",
-			"    <filter>",
-			"      <filter type='and'>",
-			"        <condition attribute='" + regardingField + "' operator='eq' value='", this.currentRecord.id, "'/>",
-			"      </filter>",
+			"    <attribute name='" + titleField + "' />",
+			"    <filter type='and'>",
+			"      <condition attribute='" + regardingField + "' operator='not-null' />", ,
+			"      <condition attribute='" + regardingField + "' operator='eq' value='", fetchData.regardingobjectid, "'/>",
+			"      <condition attribute='" + titleField + "' operator='not-null' />",
 			"    </filter>",
+			"  </entity>",
 			"</fetch>",
 		].join("");
 
