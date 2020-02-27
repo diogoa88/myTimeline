@@ -1,6 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <manifest>
-  <control namespace="myp" constructor="myTimeline" version="0.0.67" display-name-key="myTimeline" description-key="myTimeline description" control-type="standard">
+  <control namespace="myp" constructor="myTimeline" version="0.0.117" display-name-key="myTimeline" description-key="myTimeline description" control-type="standard">
     <!-- property node identifies a specific, configurable piece of data that the control expects from CDS -->
     <property name="sampleProperty" display-name-key="Property_Display_Key" description-key="Property_Desc_Key" of-type="SingleLine.Text" usage="bound" />
     <!-- 

@@ -11,13 +11,13 @@ export class myTimeline implements ComponentFramework.StandardControl<IInputs, I
 
 	private contextObj: ComponentFramework.Context<IInputs>;
 	private mainContainer: HTMLDivElement;
-	private buttonExample: HTMLButtonElement;
-	private selectExample: HTMLSelectElement;
 	private visuContainer: HTMLDivElement;
 	private timeline: any;
 	private currentRecord: any;
 	private activities: any;
+	private configurations: any;
 	private _notifyOutputChanged: () => void;
+	private isRefresh = false;
 
 	/**
 	 * Empty constructor.
@@ -37,40 +37,18 @@ export class myTimeline implements ComponentFramework.StandardControl<IInputs, I
 	public init(context: ComponentFramework.Context<IInputs>, notifyOutputChanged: () => void, state: ComponentFramework.Dictionary, container: HTMLDivElement) {
 		this.contextObj = context;
 		this.currentRecord = this.getPageParameters();
-		this.activities = this.getConfigurationMain(this.currentRecord.etn);
-		debugger;
-		console.log(this.activities);
 		this._notifyOutputChanged = notifyOutputChanged;
 
 		// Create main table container div. 
 		this.mainContainer = document.createElement("div");
 
-		// this.buttonExample = document.createElement("button");
-		// this.buttonExample.innerText = "Button Test";
-		// this.mainContainer.appendChild(this.buttonExample);
-
 		// Create Timeline container
 		this.visuContainer = document.createElement("div");
 		this.visuContainer.setAttribute("id", "visualisation");
-
-		// this.buttonExample = document.createElement("button");
-		// this.buttonExample.innerText = "Button Test";
-
-		// this.selectExample = document.createElement("select");
-		// this.selectExample.multiple = true;
-		// var opt1 = document.createElement("option");
-		// var opt2 = document.createElement("option");
-		// opt1.value = "1";
-		// opt1.text = "Option: Value 1";
-		// opt2.value = "2";
-		// opt2.text = "Option: Value 2";
-		// this.selectExample.add(opt1);
-		// this.selectExample.add(opt2);
-
-		// this.mainContainer.appendChild(this.selectExample);
-		// this.mainContainer.appendChild(this.buttonExample);
 		this.mainContainer.appendChild(this.visuContainer);
 		container.appendChild(this.mainContainer);
+
+		this.isRefresh = true;
 	}
 
 
@@ -79,44 +57,53 @@ export class myTimeline implements ComponentFramework.StandardControl<IInputs, I
 	 * @param context The entire property bag available to control via Context Object; It contains values as set up by the customizer mapped to names defined in the manifest, as well as utility functions
 	 */
 	public updateView(context: ComponentFramework.Context<IInputs>): void {
-		this.createTimeLine();
+		if (this.isRefresh == true) {
+			this.initAll();
+		} else {
+			this.createTimeline();
+		}
 	}
 
-	private createTimeLine() {
-		var dateColumn1 = this.activities.myp_startdate;
-		var dateColumn2 = this.activities.myp_enddate;
-		var labelColumn = this.activities.myp_name;
+	private async initAll() {
+		await this.initConfiguration(this.currentRecord.etn);
+		await this.initActivities();
+		this.createTimeline();
+		this.isRefresh = false;
+	}
 
-		var timeLineItems = new visDataSet([
-		]);
+	public createTimeline() {
+		var timeLineItems = new visDataSet([]);
+
+		console.log(this.activities);
 
 		let i = 0;
 
+		for (let currentActivity of this.activities) {
+			var startdate = currentActivity[currentActivity.startDateField] != null ? new Date(currentActivity[currentActivity.startDateField]) : new Date();
+			var enddate = currentActivity[currentActivity.endDateField] != null ? new Date(currentActivity[currentActivity.endDateField]) : new Date();
+			var label = currentActivity[currentActivity.descriptionField] != null ? currentActivity[currentActivity.descriptionField] : "";
+			var color = currentActivity.colorField;
 
+			if (startdate != null && startdate != new Date() && label != null && label != "" && label != undefined) {
+				let item = {
+					id: ++i,
+					content: label,
+					start: this.FormatDate(startdate),
+					end: (enddate != new Date()) ? this.FormatDate(enddate) : "",
+					type: 'box',
+					title: '',
+					style: "background-color: " + color + ";"
+				}
 
-		// for (let currentRecordId of timeLineItems.sortedRecordIds) {
-		// 	let startdate = timeLineItems.records[currentRecordId].getFormattedValue(dateColumn1);
-		// 	let enddate = timeLineItems.records[currentRecordId].getFormattedValue(dateColumn2);
-		// 	let label = timeLineItems.records[currentRecordId].getFormattedValue(labelColumn);
-
-		// 	if (startdate != null && startdate != "" && label != null && label != "") {
-		// 		let item = {
-		// 			id: ++i,
-		// 			content: label,
-		// 			start: moment(startdate, "D/MM/YYYY h:mm A").format('YYYY-MM-DD h:mm A'),
-		// 			end: (enddate != null) ? moment(enddate, "D/MM/YYYY h:mm A").format('YYYY-MM-DD h:mm A') : "",
-		// 			type: 'box',
-		// 			title: ''
-		// 		}
-		// 		item["title"] = (item.end != "") ? item.start + "  -  " + item.end : item.start;
-		// 		timeLineItems.add(item);
-		// 	}
-		// }
-
+				item["title"] = (item.end != "") ? item.start + "  -  " + item.end : item.start;
+				timeLineItems.add(item);
+			}
+		}
 
 		// Configuration for the Timeline
 		var options = {};
 
+		debugger;
 		// Create a Timeline
 		if (!this.timeline)
 			this.timeline = new visTimeLine(this.visuContainer, timeLineItems, options);
@@ -139,11 +126,77 @@ export class myTimeline implements ComponentFramework.StandardControl<IInputs, I
 		// Add code to cleanup control if necessary
 	}
 
-	public async getConfigurationMain(entityName: string) {
-		try{
-			return await this.getConfiguration(entityName);
-		}catch(error){
-			return Promise.reject(error);
+	public FormatDate(d: Date) {
+		var dformat = [d.getMonth() + 1,
+		d.getDate(),
+		d.getFullYear()].join('/') + ' ' +
+			[d.getHours(),
+			d.getMinutes()].join(':');
+		return dformat;
+	}
+
+	public async initActivities() {
+		this.activities = new Array();
+
+		for (let currentConfiguration of this.configurations) {
+			var startDateField = currentConfiguration["childConfig.myp_startdate"];
+			var endDateField = currentConfiguration["childConfig.myp_enddate"];
+			var descriptionField = currentConfiguration["childConfig.myp_descriptionfield"];
+			var entityNameField = currentConfiguration["childConfig.myp_entityname"];
+			var regardingName = currentConfiguration["childConfig.myp_regardingname"];
+			var colorField = currentConfiguration["childConfig.myp_color"];
+
+			try {
+				var activityAux = await this.getActivity(startDateField, endDateField, descriptionField, entityNameField, regardingName);
+				activityAux = JSON.parse(JSON.stringify(activityAux));
+
+				for (let activityTemp of activityAux) {
+					activityTemp.startDateField = startDateField;
+					activityTemp.endDateField = endDateField;
+					activityTemp.descriptionField = descriptionField;
+					activityTemp.entityNameField = entityNameField;
+					activityTemp.regardingName = regardingName;
+					activityTemp.colorField = colorField;
+					this.activities.push(activityTemp);
+				}
+			} catch (error) {
+				console.log("Error: " + error);
+			}
+		}
+	}
+
+	public async getActivity(startDateField: string, endDateField: string, descriptionField: string, entityName: string, regardingField: string) {
+		debugger;
+		var fetchXml = [
+			"<fetch>",
+			"  <entity name='" + entityName + "' />",
+			"    <attribute name='" + startDateField + "' />",
+			"    <attribute name='" + endDateField + "' />",
+			"    <attribute name='" + descriptionField + "' />",
+			"    <filter>",
+			"      <filter type='and'>",
+			"        <condition attribute='" + regardingField + "' operator='eq' value='", this.currentRecord.id, "'/>",
+			"      </filter>",
+			"    </filter>",
+			"</fetch>",
+		].join("");
+
+		return this.contextObj.webAPI.retrieveMultipleRecords(entityName, "?fetchXml=" + fetchXml).then(
+			function success(results) {
+				return results.entities;
+			},
+			function (error) {
+				return error;
+			}
+		);
+	}
+
+	public async initConfiguration(entityName: string) {
+		try {
+			var configurationsAux = await this.getConfiguration(entityName);
+			this.configurations = JSON.parse(JSON.stringify(configurationsAux));
+		} catch (error) {
+			console.log("Error: " + error);
 		}
 	}
 
@@ -155,7 +208,7 @@ export class myTimeline implements ComponentFramework.StandardControl<IInputs, I
 			"<fetch>",
 			"  <entity name='myp_mytimelineconfiguration'>",
 			"    <filter type='and'>",
-			"      <condition attribute='myp_entityname' operator='eq' value='", fetchData.myp_entityname/*account*/, "'/>",
+			"      <condition attribute='myp_entityname' operator='eq' value='", fetchData.myp_entityname, "'/>",
 			"    </filter>",
 			"    <link-entity name='myp_myp_mytimelineconfiguration_myp_mytimel' from='myp_mytimelineconfigurationidone' to='myp_mytimelineconfigurationid' link-type='inner' intersect='true'>",
 			"      <link-entity name='myp_mytimelineconfiguration' from='myp_mytimelineconfigurationid' to='myp_mytimelineconfigurationidtwo' link-type='inner' alias='childConfig'>",
@@ -175,12 +228,12 @@ export class myTimeline implements ComponentFramework.StandardControl<IInputs, I
 			"  </entity>",
 			"</fetch>",].join("");
 
-		return this.contextObj.webAPI.retrieveMultipleRecords("myp_mytimelineconfiguration", "?fetchXml="+ fetchXml).then(
+		return this.contextObj.webAPI.retrieveMultipleRecords("myp_mytimelineconfiguration", "?fetchXml=" + fetchXml).then(
 			function success(results) {
-				return results;
+				return results.entities;
 			},
-			function(error) {
-				return Promise.reject(error);
+			function (error) {
+				return error;
 			}
 		);
 	}
