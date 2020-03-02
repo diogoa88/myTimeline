@@ -989,3 +989,8 @@ div.vis-tooltip {
     margin: 0;
     box-sizing: border-box
 }
+
+.filter-btn {
+    margin: 10px;
+    color: #ffffff !important;
+}
